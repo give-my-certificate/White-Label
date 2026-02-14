@@ -1,0 +1,14 @@
+.board_container {
+	height: 80vh;
+	display: flex;
+}
+.artboard_container {
+	display: flex;
+	height: 100%;
+	flex-grow: 4;
+}
+.artboard {
+	height: 100%;
+	width: 80%;
+	margin: auto;
+}
