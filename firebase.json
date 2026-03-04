@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "target": "certificate",
     "public": "build",
     "ignore": [
       "firebase.json",

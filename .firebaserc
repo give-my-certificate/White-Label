@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "gmc-testing"
+  },
+  "targets": {
+    "gmc-testing": {
+      "hosting": {
+        "certificate": [
+          "climacto-certificate"
+        ]
+      }
+    }
   }
 }

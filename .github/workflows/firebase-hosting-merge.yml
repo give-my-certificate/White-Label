@@ -35,3 +35,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLIMACTO_CERTIFICATE }}
           channelId: live
           projectId: gmc-testing
+          target: certificate
