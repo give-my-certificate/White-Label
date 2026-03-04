@@ -1,5 +1,5 @@
 .board_container {
-	height: 80vh;
+	height: 60vh;
 	display: flex;
 }
 .artboard_container {
@@ -9,6 +9,6 @@
 }
 .artboard {
 	height: 100%;
-	width: 80%;
+	width: 100%;
 	margin: auto;
 }

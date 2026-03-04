@@ -1,32 +1,56 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useState as useHState } from "@hookstate/core";
-import { Box, Divider, Flex, Heading, HStack, Img, Text, LinkBox, LinkOverlay, VStack, useColorModeValue, IconButton } from "@chakra-ui/react";
-import { Button, Icon, Tooltip } from "@chakra-ui/react";
-import { FaDownload, FaFacebook, FaFilePdf, FaImage, FaLinkedin} from "react-icons/fa";
+import { Box, Flex, VStack, useColorModeValue } from "@chakra-ui/react";
 import { jsPDF } from "jspdf";
 import PreviewCertificate, { Config, PreviewCertificateType } from "../../components/certificate/PreviewCertificate";
-import { Card } from "../../components/card/Card";
 import supabase from "../../configs/Supabase";
 import Loading from "../../components/loading/Loading";
 import { NotFound } from "../../components/notFound/NotFound";
 import loadScript from "../../commonFunctions/loadScript";
-import { PoweredBy } from "../../components/poweredBy/PoweredBy";
-import MindMergeLogSq from '../../assets/images/mindmergesq.png'
 import { useOrganizationConfig } from "../../context/OrganizationConfigContext";
 
 import styles from "../../styles/components/certificate.module.css";
 import { ElementsType } from "../../components/certificate/DrawingSheet";
 import { setWait } from "../../commonFunctions/commonFunctions";
 
+import { CertificateHeader } from "../../components/displayCertificate/CertificateHeader";
+import { ActionsCard } from "../../components/displayCertificate/ActionsCard";
+import { RecipientCard } from "../../components/displayCertificate/RecipientCard";
+import { MetadataGrid } from "../../components/displayCertificate/MetadataGrid";
+import { ProgramNameCard } from "../../components/displayCertificate/ProgramNameCard";
+import { IssuedByCard } from "../../components/displayCertificate/IssuedByCard";
+import { ShareFollowFooter } from "../../components/displayCertificate/ShareFollowFooter";
+
 export interface ImageElementsHolderType {
 	[key:string]: HTMLImageElement
 }
 
+// Parse date range string like "January 2022 - July 2022" into start/end
+const parseDateRange = (dateStr?: string): { startDate?: string; endDate?: string } => {
+	if (!dateStr) return {};
+	const parts = dateStr.split(" - ");
+	return {
+		startDate: parts[0]?.trim(),
+		endDate: parts[1]?.trim(),
+	};
+};
+
+// Extract org name and subtitle from "OrgName | Subtitle" format
+const parseOrgName = (orgName?: string): { name: string; subtitle?: string } => {
+	if (!orgName) return { name: "Unknown Organization" };
+	const parts = orgName.split("|");
+	return {
+		name: parts[0]?.trim() || orgName,
+		subtitle: parts[1]?.trim(),
+	};
+};
+
 export const DisplayCertificate = () => {
 	//@ts-ignore
 	const { id } = useParams();
-	const textColor = useColorModeValue('gray.600', 'gray.400')
+	const pageBg = useColorModeValue('gray.50', 'gray.800');
+	const cardBg = useColorModeValue('white', 'gray.700');
 	const [certificateData, setCertificateData] = useState<any>(null);
 	const [isShareThisScriptLoaded, setIsShareThisScriptLoaded] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
@@ -131,10 +155,10 @@ export const DisplayCertificate = () => {
 
 	useEffect(() => {
 		if (!certificateData || !orgConfig) return; // Wait for config to be loaded
-		
+
 		let imageObjectsHolder:HTMLImageElement[] = []
 		const verificationUrl = getVerificationUrl(certificateData.id);
-		
+
 		Object.keys(elementsData).map((key, index) => {
 			if (key === "gmc_link") {
 				// @ts-ignore
@@ -175,7 +199,7 @@ export const DisplayCertificate = () => {
 				// @ts-ignore
 				elementsData[key]["data"]["text"].set(certificateData?.extra_metadata[elementsData.get()[key]['header']]);
 			}
-			
+
 			return true
 		});
 
@@ -188,7 +212,8 @@ export const DisplayCertificate = () => {
 
 	if (certificateData) {
 		const bg = certificateData?.templateImageUrl;
-		
+		const isIdCard = certificateData?.extra_metadata['type'] === 'ID-Card';
+
 		let linkedinUrl = new URL('https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME')
 		if (certificateData.event_name) {
 			linkedinUrl.searchParams.append('name', certificateData.event_name)
@@ -208,162 +233,101 @@ export const DisplayCertificate = () => {
 			linkedinUrl.searchParams.append('certId', certificateData.id)
 		}
 
+		const { name: orgName, subtitle: orgSubtitle } = parseOrgName(certificateData.organization_name);
+		const { startDate, endDate } = parseDateRange(certificateData.extra_metadata?.date);
+
+		const handleVerify = () => {
+			window.open(
+				window.location.href.replace('certificate', 'verification').replace('/c/', '/v/'),
+				"_blank"
+			);
+		};
 
 		return (
-			<div>
-				<Flex direction={["column", null, null, "row"]}>
-					<Box w={["100%", null, null, "80%"]} maxW={["100%", null, null, "80%"]}>
-						<div className={styles.board_container}>
-							<div className={styles.artboard_container}>
-								<div className={styles.artboard} id='preview_certificate'>
-									<PreviewCertificate
-										ref={previewCertificateRef}
-										configData={configData}
-										elementsData={elementsData}
-										bg={bg}
-										imageLeftToRender={imageLeftToRender}
-										isWhiteLabeled={certificateData?.is_white_labeled}
-										imageElementsHolder={imageElementsHolder}
-										orgConfig={orgConfig}
-									/>
+			<Box bg={pageBg} minH="100vh">
+				{/* Header */}
+				<CertificateHeader
+					orgName={orgName}
+					orgSubtitle={orgSubtitle}
+					orgLogoUrl={orgConfig?.logoUrl || certificateData.organization_logo_url}
+				/>
+
+				{/* Main content */}
+				<Box maxW="1200px" mx="auto" pt="70px" px={{ base: 3, md: 6 }} pb={8}>
+					{/* Certificate + Actions row */}
+					<Flex
+						direction={{ base: "column", lg: "row" }}
+						gap={4}
+						mb={6}
+					>
+						{/* Certificate Canvas */}
+						<Box
+							flex={{ lg: "0 0 65%" }}
+							w={{ base: "100%", lg: "65%" }}
+							bg={cardBg}
+							rounded="lg"
+							shadow="base"
+							overflow="hidden"
+						>
+							<div className={styles.board_container}>
+								<div className={styles.artboard_container}>
+									<div className={styles.artboard} id='preview_certificate'>
+										<PreviewCertificate
+											ref={previewCertificateRef}
+											configData={configData}
+											elementsData={elementsData}
+											bg={bg}
+											imageLeftToRender={imageLeftToRender}
+											isWhiteLabeled={certificateData?.is_white_labeled}
+											imageElementsHolder={imageElementsHolder}
+											orgConfig={orgConfig}
+										/>
+									</div>
 								</div>
 							</div>
-						</div>
-					</Box>
-					<Box w={["100%", null, null, "20%"]} maxW={["100%", null, null, "20%"]}>
-						<Card>
-							<Heading size='md'>Issued By</Heading>
-							<Divider mb={4} mt={2} />
-							<LinkBox>
-								<Flex alignItems="center">
-									<Img
-										htmlWidth="20px"
-										htmlHeight="20px"
-										height='20px'
-										mr={3}
-										objectFit="cover"
-										src={orgConfig?.logoUrl || certificateData.organization_logo_url || MindMergeLogSq}
-										alt={certificateData.organization_name || "Organization Logo"}
-									/>
-									<LinkOverlay href={certificateData.organization_website || orgConfig?.headerLinkUrl || '/#'}>
-										<Heading size="xs" wordBreak="break-all">
-											{certificateData.organization_name}
-										</Heading>
-									</LinkOverlay>
-								</Flex>
-							</LinkBox>
+						</Box>
 
-							<Heading size='md' mt={6}>Actions</Heading>
-							<Divider mb={4} mt={2} />
-							<Heading size='sm' mb={3}>
-								Download
-							</Heading>
-							<VStack alignItems="flex-start">
-								<Tooltip label='Download Certificate as Image' aria-label='Download Certificate'>
-									<Button 
-										rightIcon={<FaDownload />} 
-										colorScheme='blue' 
-										variant='outline' 
-										onClick={handleDownloadImage}
-										isLoading={isDownloadImageLoading}
-										loadingText='Loading...'
-										isDisabled={(imageLeftToRender !== 0)}
-									>
-										As Image <Icon as={FaImage} ml={2} />
-									</Button>
-								</Tooltip>
-								<Tooltip label='Download Certificate as pdf' aria-label='Download Certificate as pdf'>
-									<Button
-										rightIcon={<FaDownload />}
-										colorScheme='red'
-										variant='outline'
-										onClick={handleDownloadPDF}
-										isLoading={isExportLoading}
-										loadingText='Loading...'
-										isDisabled={(imageLeftToRender !== 0)}
-									>
-										As Pdf <Icon as={FaFilePdf} ml={2} />
-									</Button>
-								</Tooltip>
-								{/* {	(certificateData?.extra_metadata['type'] !== 'ID-Card' ) &&
-									(
-									<Tooltip label='Verify your Certificate' aria-label='Verify your Certificate'>
-										<Button
-											rightIcon={<FaCheckCircle />}
-											colorScheme='green'
-											variant='outline'
-											onClick={() => window.open(window.location.href.replace('certificate', 'verification').replace('/c/', '/v/'), "_blank")}
-										>
-											Verify
-										</Button>
-									</Tooltip>
-									)
-								} */}
-								{	(certificateData?.extra_metadata['type'] !== 'ID-Card' ) &&
-									(
-									<Tooltip label='Add your certificate to linked in' aria-label='Download Certificate as pdf'>
-										<Button
-											rightIcon={<FaLinkedin />}
-											colorScheme='linkedin'
-											variant='solid'
-											onClick={() => window.open(linkedinUrl.toString(), "_blank")}
-										>
-											Add to linkedIn
-										</Button>
-									</Tooltip>
-									)
-								}
-							</VStack>
-							<Divider mb={4} mt={8} />
-							<Heading size='sm' mb={3}>
-								Share
-							</Heading>
-							<HStack justifyContent='center'>
-								<div className='sharethis-inline-share-buttons' />
-							</HStack>
-							<Divider mb={4} mt={8} />
-							<Flex justifyContent="center" mb="3">
-								<Text color={textColor}>
-									Follow us at
-								</Text>
-							</Flex>
-							<Flex justifyContent="center">
-								<HStack>
-									{orgConfig?.socialLinks?.facebook && (
-										<Tooltip label="Follow on facebook" aria-label="Follow on facebook">
-											<IconButton 
-												aria-label="Follow on facebook"
-												icon={<FaFacebook />}
-												colorScheme="facebook"
-												onClick={() => window.open(orgConfig.socialLinks.facebook, "_blank")}
-											/>
-										</Tooltip>
-									)}
-									{orgConfig?.socialLinks?.linkedin && (
-										<Tooltip label="Follow on Linked In" aria-label="Follow on Linked In">
-											<IconButton 
-												aria-label="Follow on Linked In"
-												icon={<FaLinkedin />}
-												colorScheme="linkedin"
-												onClick={() => window.open(orgConfig.socialLinks.linkedin, "_blank")}
-											/>
-										</Tooltip>
-									)}
-									{/* <Tooltip label="Follow on Instagram" aria-label="Follow on Instagram">
-										<IconButton 
-											aria-label="Follow on Instagram"
-											icon={<FaInstagram />}
-											colorScheme="orange"
-											onClick={() => window.open('https://instagram.com/upgrad_edu?igshid=YmMyMTA2M2Y=', "_blank")}
-										/>
-									</Tooltip> */}
-								</HStack>
-							</Flex>
-							<PoweredBy forcedColumnLayout={true} />
-						</Card>
-					</Box>
-				</Flex>
-			</div>
+						{/* Actions Card */}
+						<Box flex={{ lg: "0 0 35%" }} w={{ base: "100%", lg: "35%" }}>
+							<ActionsCard
+								onDownload={handleDownloadImage}
+								onDownloadPdf={handleDownloadPDF}
+								onLinkedIn={() => window.open(linkedinUrl.toString(), "_blank")}
+								onVerify={handleVerify}
+								isDownloadLoading={isDownloadImageLoading}
+								isPdfLoading={isExportLoading}
+								isDisabled={imageLeftToRender !== 0}
+								isIdCard={isIdCard}
+							/>
+						</Box>
+					</Flex>
+
+					{/* Info cards stack */}
+					<VStack spacing={4} w="100%">
+						{certificateData.extra_metadata?.name && (
+							<RecipientCard name={certificateData.extra_metadata.name} />
+						)}
+
+						<MetadataGrid
+							certificateType={certificateData.extra_metadata?.certificateType}
+							startDate={startDate}
+							endDate={endDate}
+							certificateId={certificateData.id}
+						/>
+
+						{certificateData.event_name && (
+							<ProgramNameCard programName={certificateData.event_name} />
+						)}
+
+						<IssuedByCard organizationName={certificateData.organization_name} />
+
+						<ShareFollowFooter
+							shareUrl={window.location.href}
+							socialLinks={orgConfig?.socialLinks}
+						/>
+					</VStack>
+				</Box>
+			</Box>
 		);
 	}
 
